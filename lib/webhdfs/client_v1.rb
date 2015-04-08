@@ -156,25 +156,63 @@ module WebHDFS
 
     # curl -i -X PUT "http://<HOST>:<PORT>/webhdfs/v1/<PATH>?op=SETPERMISSION
     #                 [&permission=<OCTAL>]"
-    def chmod(path, mode, options={})
+    # support recursive chmod on a directory tree
+    def chmod(path, options={})
       check_options(options, OPT_TABLE['SETPERMISSION'])
-      res = operate_requests('PUT', path, 'SETPERMISSION', options.merge({'permission' => mode}))
-      res.code == '200'
+      unless options.has_key?('permission') or options.has_key?(:permission)
+        raise ArgumentError, "'chmod' needs permission"
+      end
+      recursive = options['recursive'] != nil ? options.delete('recursive') : options.delete(:recursive)
+      res = operate_requests('PUT', path, 'SETPERMISSION', options)
+      return false if res.code != '200'
+      if recursive == true
+        queue = Array.new
+        queue.unshift(path)
+        while !queue.empty?
+          node = queue.pop
+          listmeta = list(node)
+          listmeta.each do |elem|
+            node = node + ::File::SEPARATOR + elem["pathSuffix"]
+            res = operate_requests('PUT', node, 'SETPERMISSION', options)
+            return false if res.code != '200'
+            queue.unshift(node) if elem['type'] == "DIRECTORY"
+          end
+        end
+      end
+      return true
     end
+    OPT_TABLE['SETPERMISSION'] = ['permission', 'recursive']
     alias :setpermission :chmod
 
     # curl -i -X PUT "http://<HOST>:<PORT>/webhdfs/v1/<PATH>?op=SETOWNER
     #                          [&owner=<USER>][&group=<GROUP>]"
+    # support recursive chown on a directory tree
     def chown(path, options={})
       check_options(options, OPT_TABLE['SETOWNER'])
       unless options.has_key?('owner') or options.has_key?('group') or
           options.has_key?(:owner) or options.has_key?(:group)
         raise ArgumentError, "'chown' needs at least one of owner or group"
       end
+      recursive = options['recursive'] != nil ? options.delete('recursive') : options.delete(:recursive)
       res = operate_requests('PUT', path, 'SETOWNER', options)
-      res.code == '200'
+      return false if res.code != '200'
+      if recursive == true
+        queue = Array.new
+        queue.unshift(path)
+        while !queue.empty?
+          node = queue.pop
+          listmeta = list(node)
+          listmeta.each do |elem|
+            node = node + ::File::SEPARATOR + elem["pathSuffix"]
+            res = operate_requests('PUT', node, 'SETOWNER', options)
+            return false if res.code != '200'
+            queue.unshift(node) if elem['type'] == "DIRECTORY"
+          end
+        end
+      end
+      return true
     end
-    OPT_TABLE['SETOWNER'] = ['owner', 'group']
+    OPT_TABLE['SETOWNER'] = ['owner', 'group', 'recursive']
     alias :setowner :chown
 
     # curl -i -X PUT "http://<HOST>:<PORT>/webhdfs/v1/<PATH>?op=SETREPLICATION

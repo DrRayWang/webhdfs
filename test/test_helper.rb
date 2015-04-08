@@ -3,10 +3,8 @@ $LOAD_PATH.unshift(File.dirname(__FILE__))
 
 require 'rubygems'
 require 'rr'
+gem "minitest", "4.7.5"
 require 'test/unit'
-class Test::Unit::TestCase
-  include RR::Adapters::TestUnit
-end
 
 if ENV['SIMPLE_COV']
   require 'simplecov'
@@ -16,5 +14,3 @@ if ENV['SIMPLE_COV']
     add_filter 'vendor/'
   end
 end
-
-require 'test/unit'
